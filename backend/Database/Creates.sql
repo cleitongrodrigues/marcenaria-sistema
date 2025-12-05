@@ -5,11 +5,27 @@ GO
 CREATE TABLE Clientes (
     Id INT PRIMARY KEY IDENTITY(1,1),
     Nome VARCHAR(100) NOT NULL,
-    Telefone VARCHAR(20),
-    Endereco VARCHAR(200),
+    CPF VARCHAR(14) UNIQUE NOT NULL, -- Ex: 111.222.333-44
+    Telefone VARCHAR(20) NOT NULL,
     Ativo BIT DEFAULT 1 NOT NULL, -- 1 = Visível, 0 = Lixeira
     DataCriacao DATETIME DEFAULT GETDATE(),
-    DataAlteracao DATETIME DEFAULT GETDATE()
+    DataAlteracao DATETIME DEFAULT NULL
+);
+CREATE NONCLUSTERED INDEX IX_Clientes_CPF ON Clientes(CPF);
+
+CREATE TABLE Enderecos (
+    Id INT PRIMARY KEY IDENTITY(1,1),
+    ClienteId INT NOT NULL,
+    Logradouro VARCHAR(150) NOT NULL,
+    Numero VARCHAR(20) NOT NULL,
+    Bairro VARCHAR(100) NOT NULL,
+    Cidade VARCHAR(100) NOT NULL,
+    UF CHAR(2) NOT NULL,
+    CEP VARCHAR(9),
+    Complemento VARCHAR(100),
+    DataCriacao DATETIME DEFAULT GETDATE(),
+    DataAlteracao DATETIME DEFAULT NULL,    
+    CONSTRAINT FK_Endereco_Cliente FOREIGN KEY (ClienteId) REFERENCES Clientes(Id)
 );
 
 -- =============================================
@@ -20,9 +36,7 @@ CREATE TABLE Materiais (
     Nome VARCHAR(100) NOT NULL,
     Categoria VARCHAR(50) NOT NULL, 
     PrecoUnitario DECIMAL(18, 2) NOT NULL CHECK (PrecoUnitario >= 0),
-    UnidadeMedida VARCHAR(10) NOT NULL, 
-    
-    -- SEGURANÇA E AUDITORIA
+    UnidadeMedida VARCHAR(10) NOT NULL,     
     Ativo BIT DEFAULT 1 NOT NULL,
     DataCriacao DATETIME DEFAULT GETDATE(),
     DataAlteracao DATETIME DEFAULT GETDATE()
@@ -41,15 +55,11 @@ CREATE TABLE Orcamentos (
     ValorTotalCusto DECIMAL(18, 2) DEFAULT 0,
     ValorFinalVenda DECIMAL(18, 2) DEFAULT 0,
     Observacao VARCHAR(500),
-    
-    -- SEGURANÇA E AUDITORIA
+    OR_Status VARCHAR(20) DEFAULT 'Em Aberto', -- Controle do fluxo (Aberto -> Aprovado)    
     Ativo BIT DEFAULT 1 NOT NULL, -- Se o cliente cancelar, você apenas inativa aqui
     DataCriacao DATETIME DEFAULT GETDATE(),
     DataAlteracao DATETIME DEFAULT GETDATE(),
-
-    -- RELACIONAMENTO SEGURO (Sem Cascade Delete)
     CONSTRAINT FK_Orcamento_Cliente FOREIGN KEY (ClienteId) REFERENCES Clientes(Id)
-    -- Se tentar dar DELETE no Cliente, o banco BLOQUEIA se houver orçamentos
 );
 CREATE NONCLUSTERED INDEX IX_Orcamentos_ClienteId ON Orcamentos(ClienteId);
 
@@ -104,65 +114,4 @@ DROP TABLE IF EXISTS Enderecos;              -- Nível 1 (Filho do Cliente - NOV
 DROP TABLE IF EXISTS Clientes;               -- Nível 0 (Pai)
 -- Materiais pode ficar ou ser recriada (vou recriar para garantir)
 DROP TABLE IF EXISTS Materiais; 
-GO
-
--- ==============================================================================
--- 2. CRIAÇÃO DAS TABELAS (ESTRUTURA ENTERPRISE)
--- ==============================================================================
-
--- Tabela Clientes (Normalizada)
-CREATE TABLE Clientes (
-    Id INT PRIMARY KEY IDENTITY(1,1),
-    Nome VARCHAR(100) NOT NULL,
-    CPF VARCHAR(14), -- Ex: 111.222.333-44
-    Telefone VARCHAR(20) NOT NULL,
-    
-    Ativo BIT DEFAULT 1 NOT NULL,
-    DataCriacao DATETIME DEFAULT GETDATE(),
-    DataAlteracao DATETIME DEFAULT GETDATE()
-);
-CREATE NONCLUSTERED INDEX IX_Clientes_CPF ON Clientes(CPF);
-
--- Tabela Endereços (Separada)
-CREATE TABLE Enderecos (
-    Id INT PRIMARY KEY IDENTITY(1,1),
-    ClienteId INT NOT NULL,
-    Logradouro VARCHAR(150) NOT NULL,
-    Numero VARCHAR(20) NOT NULL,
-    Bairro VARCHAR(100) NOT NULL,
-    Cidade VARCHAR(100) NOT NULL,
-    UF CHAR(2) NOT NULL,
-    CEP VARCHAR(9),
-    Complemento VARCHAR(100),
-    DataCriacao DATETIME DEFAULT GETDATE(),
-    DataAlteracao DATETIME DEFAULT GETDATE(),
-    
-    CONSTRAINT FK_Endereco_Cliente FOREIGN KEY (ClienteId) REFERENCES Clientes(Id)
-);
-
--- Recriando as outras para não quebrar o sistema (Orçamentos e Materiais)
-CREATE TABLE Materiais (
-    Id INT PRIMARY KEY IDENTITY(1,1),
-    Nome VARCHAR(100) NOT NULL,
-    Categoria VARCHAR(50) NOT NULL, 
-    PrecoUnitario DECIMAL(18, 2) NOT NULL CHECK (PrecoUnitario >= 0),
-    UnidadeMedida VARCHAR(10) NOT NULL, 
-    Ativo BIT DEFAULT 1 NOT NULL,
-    DataCriacao DATETIME DEFAULT GETDATE(),
-    DataAlteracao DATETIME DEFAULT GETDATE()
-);
-
-CREATE TABLE Orcamentos (
-    Id INT PRIMARY KEY IDENTITY(1,1),
-    ClienteId INT NOT NULL,
-    DataCriacao DATETIME DEFAULT GETDATE(),
-    DataAlteracao DATETIME DEFAULT GETDATE(),
-    Status VARCHAR(20) DEFAULT 'Em Aberto', 
-    MargemLucro DECIMAL(5, 2) DEFAULT 0 CHECK (MargemLucro >= 0), 
-    ValorTotalCusto DECIMAL(18, 2) DEFAULT 0,
-    ValorFinalVenda DECIMAL(18, 2) DEFAULT 0,
-    Observacao VARCHAR(500),
-    Ativo BIT DEFAULT 1 NOT NULL,
-    CONSTRAINT FK_Orcamento_Cliente FOREIGN KEY (ClienteId) REFERENCES Clientes(Id)
-);
 GO
