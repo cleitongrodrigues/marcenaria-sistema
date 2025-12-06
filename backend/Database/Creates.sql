@@ -17,7 +17,7 @@ CREATE TABLE Enderecos (
     Id INT PRIMARY KEY IDENTITY(1,1),
     ClienteId INT NOT NULL,
     Logradouro VARCHAR(150) NOT NULL,
-    Numero VARCHAR(20) NOT NULL,
+    Numero INTEGER NOT NULL,
     Bairro VARCHAR(100) NOT NULL,
     Cidade VARCHAR(100) NOT NULL,
     UF CHAR(2) NOT NULL,

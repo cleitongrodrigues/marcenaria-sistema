@@ -38,5 +38,34 @@ namespace backend.Controllers
 
             return Ok(new { id = resultado.Id, mensagem = "Cliente cadastrado com sucesso!" });
         }
+
+        [HttpPut("{id}")]
+        public async Task<IActionResult> Atualizar(int id, [FromBody] ClienteDTO cliente)
+        {
+            // Garante que o ID da URL seja usado
+            cliente.Id = id;
+
+            var resultado = await _repository.Atualizar(cliente);
+
+            if (!resultado.Sucesso)
+            {
+                return BadRequest(new { mensagem = resultado.Error });
+            }
+
+            return Ok(new { mensagem = "Cliente atualizado com sucesso!" });
+        }
+
+        [HttpDelete("{id}")]
+        public async Task<IActionResult> Deletar(int id)
+        {
+            var resultado = await _repository.Deletar(id);
+
+            if (!resultado.Sucesso)
+            {
+                return BadRequest(new { mensagem = resultado.Error });
+            }
+
+            return Ok(new { mensagem = "Cliente removido com sucesso!" });
+        }
     }
 }

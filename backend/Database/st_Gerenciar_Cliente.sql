@@ -4,7 +4,7 @@ CREATE PROCEDURE st_Gerenciar_Cliente @Acao        CHAR(1)      = 'C', -- 'C', '
                                       @CPF         VARCHAR(14)  = NULL,
                                       @Telefone    VARCHAR(20)  = NULL,
                                       @Logradouro  VARCHAR(100) = NULL,
-                                      @Numero      VARCHAR(20)  = NULL,
+                                      @Numero      INTEGER      = NULL,
                                       @Bairro      VARCHAR(50)  = NULL,
                                       @Cidade      VARCHAR(50)  = NULL,
                                       @UF          CHAR(2)      = NULL,
@@ -26,7 +26,7 @@ BEGIN
       SET @Bairro     = TRIM(@Bairro);
       SET @Cidade     = TRIM(@Cidade);
       SET @UF         = UPPER(TRIM(@UF));
-
+      
       SELECT @Return_Code = 0,
              @Error       = '';
 
@@ -37,11 +37,24 @@ BEGIN
         RAISERROR(@Error, 16, 1);
       END
 
-      IF (@Acao IN ('U','D')) AND (@Id IS NULL)
+      IF (@Acao IN ('U','D'))
       BEGIN
-      SELECT @Return_Code = 2,
-             @Error       = 'st_Gerenciar_Cliente: ID Obrigatório para a ação (' + @Acao + ')';
-      RAISERROR(@Error, 16, 1);
+        IF (@Id IS NULL)
+        BEGIN
+          SELECT @Return_Code = 2,
+                 @Error       = 'st_Gerenciar_Cliente: ID Obrigatório para a ação (' + @Acao + ')';
+          RAISERROR(@Error, 16, 1);
+        END
+
+        IF NOT EXISTS (SELECT 1
+                       FROM dbo.Clientes WITH(NOLOCK)
+                       WHERE Id    = @Id
+                         AND Ativo = 1)
+        BEGIN
+          SELECT @Return_Code = 2,
+                 @Error       = 'st_Gerenciar_Cliente: Cliente de ID (' + CAST(@Id AS VARCHAR(10)) + ') não encontrado.';
+          RAISERROR(@Error, 16, 1);
+        END
       END
 
       IF (@Acao IN ('C', 'U'))
@@ -53,7 +66,7 @@ BEGIN
             RAISERROR(@Error, 16, 1);
         END
 
-        IF (ISNULL(@Logradouro, '') = '') OR (ISNULL(@Numero, '') = '') OR (ISNULL(@Bairro, '') = '') OR (ISNULL(@Cidade, '') = '') OR
+        IF (ISNULL(@Logradouro, '') = '') OR (@Numero IS NULL) OR (ISNULL(@Bairro, '') = '') OR (ISNULL(@Cidade, '') = '') OR
            (ISNULL(@UF, '') = '') OR (ISNULL(@CEP, '') = '')
         BEGIN
           SELECT @Return_Code = 2,
@@ -175,22 +188,10 @@ BEGIN
 
         IF (@Acao = 'D')
         BEGIN
-          IF EXISTS (SELECT 1
-                     FROM dbo.Clientes WITH(NOLOCK)
-                     WHERE ID    = @Id
-                       AND Ativo = 1)
-          BEGIN
-            UPDATE dbo.Clientes
-            SET Ativo         = 0,
-                DataAlteracao = GETDATE()
-            WHERE Id = @Id;
-          END
-          ELSE
-          BEGIN
-            SELECT @Return_Code = 1,
-                   @Error       = 'st_Gerenciar_Cliente: Cliente de ID ( ' + CAST(@Id AS VARCHAR(4)) + ' ) não encontrado.';
-            RAISERROR(@Error, 16, 1);
-          END
+          UPDATE dbo.Clientes
+          SET Ativo         = 0,
+              DataAlteracao = GETDATE()
+          WHERE Id = @Id;
         END
 
       COMMIT TRANSACTION;
