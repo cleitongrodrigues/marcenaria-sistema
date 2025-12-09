@@ -1,5 +1,5 @@
 using backend.DTOs;
-using backend.Interfaces; // Usamos a Interface agora
+using backend.Interfaces;
 using Microsoft.AspNetCore.Mvc;
 
 namespace backend.Controllers
@@ -8,29 +8,25 @@ namespace backend.Controllers
     [ApiController]
     public class ClienteController : ControllerBase
     {
-        // Injetamos a Interface, não o DapperContext direto
-        private readonly IClienteRepository _repository;
+        private readonly IClienteService _service;
 
-        public ClienteController(IClienteRepository repository)
+        public ClienteController(IClienteService service)
         {
-            _repository = repository;
+            _service = service;
         }
 
         [HttpGet]
         public async Task<IActionResult> Listar()
         {
-            // O controller apenas delega a tarefa
-            var clientes = await _repository.ListarTodos();
+            var clientes = await _service.ListarTodos();
             return Ok(clientes);
         }
 
         [HttpPost]
         public async Task<IActionResult> Criar([FromBody] ClienteDTO cliente)
         {
-            // Chama o repositório e recebe a Tupla (Id, Error)
-            var resultado = await _repository.Criar(cliente);
+            var resultado = await _service.Criar(cliente);
 
-            // Verifica se veio erro na string de erro
             if (!string.IsNullOrEmpty(resultado.Error))
             {
                 return BadRequest(new { mensagem = resultado.Error });
@@ -42,10 +38,8 @@ namespace backend.Controllers
         [HttpPut("{id}")]
         public async Task<IActionResult> Atualizar(int id, [FromBody] ClienteDTO cliente)
         {
-            // Garante que o ID da URL seja usado
             cliente.Id = id;
-
-            var resultado = await _repository.Atualizar(cliente);
+            var resultado = await _service.Atualizar(cliente);
 
             if (!resultado.Sucesso)
             {
@@ -58,7 +52,7 @@ namespace backend.Controllers
         [HttpDelete("{id}")]
         public async Task<IActionResult> Deletar(int id)
         {
-            var resultado = await _repository.Deletar(id);
+            var resultado = await _service.Deletar(id);
 
             if (!resultado.Sucesso)
             {

@@ -28,18 +28,15 @@ CREATE TABLE Enderecos (
     CONSTRAINT FK_Endereco_Cliente FOREIGN KEY (ClienteId) REFERENCES Clientes(Id)
 );
 
--- =============================================
--- 2. TABELA DE MATERIAIS (Entidade Forte)
--- =============================================
 CREATE TABLE Materiais (
-    Id INT PRIMARY KEY IDENTITY(1,1),
-    Nome VARCHAR(100) NOT NULL,
-    Categoria VARCHAR(50) NOT NULL, 
+    Id            INTEGER        PRIMARY KEY IDENTITY(1,1),
+    Nome          VARCHAR(100)   NOT NULL,
+    Categoria     VARCHAR(50)    NOT NULL, 
     PrecoUnitario DECIMAL(18, 2) NOT NULL CHECK (PrecoUnitario >= 0),
-    UnidadeMedida VARCHAR(10) NOT NULL,     
-    Ativo BIT DEFAULT 1 NOT NULL,
-    DataCriacao DATETIME DEFAULT GETDATE(),
-    DataAlteracao DATETIME DEFAULT GETDATE()
+    UnidadeMedida VARCHAR(10)    NOT NULL,     
+    Ativo         BIT            DEFAULT 1 NOT NULL,
+    DataCriacao   DATETIME       DEFAULT GETDATE(),
+    DataAlteracao DATETIME       DEFAULT NULL
 );
 CREATE NONCLUSTERED INDEX IX_Materiais_Categoria ON Materiais(Categoria);
 
