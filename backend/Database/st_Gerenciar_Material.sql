@@ -1,29 +1,43 @@
-CREATE PROCEDURE st_Gerenciar_Material @Acao          CHAR(1)       = 'C', -- 'C', 'U', 'D'
-                                       @Id            INTEGER       = NULL,
-                                       @Nome          VARCHAR(100)  = NULL,
-                                       @Categoria     VARCHAR(50)   = NULL,
-                                       @PrecoUnitario DECIMAL(18,2) = NULL,
-                                       @UnidadeMedida VARCHAR(10)   = NULL,
-                                       @Return_Code   SMALLINT      = 0  OUTPUT, 
-                                       @Error         VARCHAR(255) = '' OUTPUT
+CREATE PROCEDURE st_Gerenciar_Material @Acao              CHAR(1)        = 'C', -- 'C', 'U', 'D'
+                                       @Id                INTEGER        = NULL,
+                                       @Nome              VARCHAR(100)   = NULL,
+                                       @Categoria         VARCHAR(50)    = NULL,
+                                       @Descricao         VARCHAR(500)   = NULL,
+                                       @PrecoUnitario     DECIMAL(18,2)  = NULL,
+                                       @UnidadeMedida     VARCHAR(10)    = NULL,
+                                       @QuantidadeEstoque DECIMAL(10,4)  = 0,
+                                       @EstoqueMinimo     DECIMAL(10,4)  = NULL,
+                                       @EstoqueMaximo     DECIMAL(10,4)  = NULL,
+                                       @Localizacao       VARCHAR(50)    = NULL,
+                                       @Return_Code       SMALLINT       = 0 OUTPUT,
+                                       @Error             VARCHAR(255)   = '' OUTPUT
 AS
 BEGIN
   SET NOCOUNT ON;
   SET XACT_ABORT ON;
 
   BEGIN TRY
-    SET @Acao = UPPER(TRIM(@Acao));
-    SET @Nome = TRIM(@Nome);
-    SET @Categoria = TRIM(@Categoria);
+    SET @Acao          = UPPER(TRIM(@Acao));
+    SET @Nome          = TRIM(@Nome);
+    SET @Categoria     = TRIM(@Categoria);
+    SET @Descricao     = TRIM(@Descricao);
     SET @UnidadeMedida = TRIM(@UnidadeMedida);
+    SET @Localizacao   = TRIM(@Localizacao);
 
-    SELECT @Error       = '', 
-        @Return_Code = 0;
+    SELECT @Error       = '',
+           @Return_Code = 0;
 
-    IF (ISNULL(@Acao, '') = '') OR (@Acao NOT IN ('C', 'U', 'D'))
+    IF ISNULL(@Acao, '') NOT IN ('C', 'U', 'D')
     BEGIN
-      SELECT @Return_Code = 2, 
-          @Error       = 'st_Gerenciar_Material: Ação inválida.';
+      SELECT @Return_Code = 2,
+             @Error       = 'st_Gerenciar_Material: Ação inválida.';
+      RAISERROR(@Error, 16, 1);
+    END
+
+    IF (@Acao IN ('U', 'D')) AND (ISNULL(@Id, 0) <= 0)
+    BEGIN
+      SELECT @Return_Code = 2,
+             @Error       = 'st_Gerenciar_Material: ID obrigatório.';
       RAISERROR(@Error, 16, 1);
     END
 
@@ -31,22 +45,50 @@ BEGIN
     BEGIN
       IF (ISNULL(@Nome, '') = '') OR (LEN(@Nome) < 2)
       BEGIN
-        SELECT @Return_Code = 2, 
-            @Error       = 'st_Gerenciar_Material: Nome do material é obrigatório.';
+        SELECT @Return_Code = 2,
+               @Error       = 'st_Gerenciar_Material: Nome do material obrigatório.';
         RAISERROR(@Error, 16, 1);
       END
 
       IF (ISNULL(@PrecoUnitario, -1) < 0)
       BEGIN
-        SELECT @Return_Code = 2, 
-           @Error       = 'st_Gerenciar_Material: O preço não pode ser negativo.';
+        SELECT @Return_Code = 2,
+               @Error       = 'st_Gerenciar_Material: Preço não pode ser negativo.';
         RAISERROR(@Error, 16, 1);
       END
 
-      IF (ISNULL(@UnidadeMedida, '') = '')
+      IF (ISNULL(@UnidadeMedida, '') = '') OR (@UnidadeMedida NOT IN ('m', 'm2', 'm3', 'un', 'chapa', 'pc', 'kg', 'l'))
       BEGIN
-        SELECT @Return_Code = 2, 
-           @Error       = 'st_Gerenciar_Material: Unidade de Medida (m, m2, un, chapa) é obrigatória.';
+        SELECT @Return_Code = 2,
+               @Error       = 'st_Gerenciar_Material: Unidade de medida inválida. Valores: m, m2, m3, un, chapa, pc, kg, l.';
+        RAISERROR(@Error, 16, 1);
+      END
+
+      IF (ISNULL(@QuantidadeEstoque, 0) < 0)
+      BEGIN
+        SELECT @Return_Code = 2,
+               @Error       = 'st_Gerenciar_Material: Quantidade em estoque não pode ser negativa.';
+        RAISERROR(@Error, 16, 1);
+      END
+
+      IF (@EstoqueMinimo IS NOT NULL) AND (@EstoqueMinimo < 0)
+      BEGIN
+        SELECT @Return_Code = 2,
+               @Error       = 'st_Gerenciar_Material: Estoque mínimo não pode ser negativo.';
+        RAISERROR(@Error, 16, 1);
+      END
+
+      IF (@EstoqueMaximo IS NOT NULL) AND (@EstoqueMaximo < 0)
+      BEGIN
+        SELECT @Return_Code = 2,
+               @Error       = 'st_Gerenciar_Material: Estoque máximo não pode ser negativo.';
+        RAISERROR(@Error, 16, 1);
+      END
+
+      IF (@EstoqueMinimo IS NOT NULL) AND (@EstoqueMaximo IS NOT NULL) AND (@EstoqueMinimo > @EstoqueMaximo)
+      BEGIN
+        SELECT @Return_Code = 2,
+               @Error       = 'st_Gerenciar_Material: Estoque mínimo não pode ser maior que o máximo.';
         RAISERROR(@Error, 16, 1);
       END
     END
@@ -56,23 +98,24 @@ BEGIN
       IF EXISTS (SELECT 1
                  FROM dbo.Materiais WITH(NOLOCK)
                  WHERE Nome      = @Nome
-                   AND Categoria = @Categoria -- Permite "Puxador" (Ferragem) e "Puxador" (Outro), mas não 2 Ferragens iguais
+                   AND Categoria = ISNULL(@Categoria, '')
                    AND Ativo     = 1
                    AND Id       <> ISNULL(@Id, -1))
       BEGIN
         SELECT @Return_Code = 2,
-               @Error       = 'st_Gerenciar_Material: Já existe este Material cadastrado nesta Categoria.';
+               @Error       = 'st_Gerenciar_Material: Material já cadastrado nesta categoria.';
         RAISERROR(@Error, 16, 1);
       END
     END
 
     IF (@Acao IN ('U', 'D'))
     BEGIN
-      IF (ISNULL(@Id, 0) <= 0) OR NOT EXISTS (SELECT 1
-                                              FROM dbo.Materiais WITH(NOLOCK)
-                                              WHERE Id = @Id)
+      IF NOT EXISTS (SELECT 1
+                     FROM dbo.Materiais WITH(NOLOCK)
+                     WHERE Id    = @Id
+                       AND Ativo = 1)
       BEGIN
-        SELECT @Return_Code = 2,
+        SELECT @Return_Code = 3,
                @Error       = 'st_Gerenciar_Material: Material não encontrado.';
         RAISERROR(@Error, 16, 1);
       END
@@ -84,16 +127,25 @@ BEGIN
     BEGIN
       INSERT INTO dbo.Materiais (Nome,
                                  Categoria,
+                                 Descricao,
                                  PrecoUnitario,
                                  UnidadeMedida,
+                                 QuantidadeEstoque,
+                                 EstoqueMinimo,
+                                 EstoqueMaximo,
+                                 Localizacao,
                                  Ativo,
                                  DataCriacao,
                                  DataAlteracao)
-
       VALUES (@Nome,
-              @Categoria,
+              NULLIF(@Categoria, ''),
+              NULLIF(@Descricao, ''),
               @PrecoUnitario,
               @UnidadeMedida,
+              @QuantidadeEstoque,
+              @EstoqueMinimo,
+              @EstoqueMaximo,
+              NULLIF(@Localizacao, ''),
               1,
               GETDATE(),
               NULL);
@@ -101,22 +153,23 @@ BEGIN
       SELECT SCOPE_IDENTITY() AS IdGerado;
     END
 
-    IF @Acao = 'U'
+    IF (@Acao = 'U')
     BEGIN
       UPDATE dbo.Materiais
-      SET Nome          = @Nome,
-          Categoria     = @Categoria,
-          PrecoUnitario = @PrecoUnitario,
-          UnidadeMedida = @UnidadeMedida,
-          DataAlteracao = GETDATE()
-      WHERE Id = @Id
-        AND (Nome          <> @Nome          OR
-             Categoria     <> @Categoria     OR
-             PrecoUnitario <> @PrecoUnitario OR
-             UnidadeMedida <> @UnidadeMedida);
+      SET Nome              = @Nome,
+          Categoria         = NULLIF(@Categoria, ''),
+          Descricao         = NULLIF(@Descricao, ''),
+          PrecoUnitario     = @PrecoUnitario,
+          UnidadeMedida     = @UnidadeMedida,
+          EstoqueMinimo     = @EstoqueMinimo,
+          EstoqueMaximo     = @EstoqueMaximo,
+          Localizacao       = NULLIF(@Localizacao, ''),
+          DataAlteracao     = GETDATE()
+      WHERE Id = @Id;
+      -- Nota: QuantidadeEstoque NÃO é alterada aqui, use st_Movimentar_Estoque
     END
 
-    IF @Acao = 'D'
+    IF (@Acao = 'D')
     BEGIN
       UPDATE dbo.Materiais
       SET Ativo         = 0,
@@ -126,17 +179,15 @@ BEGIN
 
     COMMIT TRANSACTION;
 
-  SELECT @Return_Code = 0,
-         @Error       = '';
+    SELECT @Return_Code = 0,
+           @Error       = '';
   END TRY
   BEGIN CATCH
     IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
 
-    SELECT @Error       = @Error,
-           @Return_Code = CASE
-                            WHEN @Return_Code = 0 THEN 1
-                            ELSE 2
-                          END; 
+    SELECT @Return_Code = CASE WHEN @Return_Code > 0 THEN @Return_Code ELSE ERROR_NUMBER() END,
+           @Error       = COALESCE(NULLIF(@Error, ''), ERROR_MESSAGE());
+    RAISERROR(@Error, 16, 1);
   END CATCH
 
   RETURN;
